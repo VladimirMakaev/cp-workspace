@@ -1,5 +1,8 @@
 [workspace]
 members = [
-    "main",
-    "algo_lib",
+    "c_gazirovkopitie",
+  "main",
+  "algo_lib",
+  "algo_bench",
 ]
+

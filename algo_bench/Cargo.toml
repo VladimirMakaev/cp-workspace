@@ -1,0 +1,14 @@
+[package]
+edition = "2021"
+name = "algo_bench"
+version = "0.1.0"
+
+[[bench]]
+harness = false
+name = "algo_bench"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+algo_lib = {path = "../algo_lib"}
+bencher = "0.1.5"
