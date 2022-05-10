@@ -5,3 +5,4 @@ pub mod compress;
 pub mod io;
 pub mod seg_tree;
 pub mod xor_set;
+pub mod dsu;

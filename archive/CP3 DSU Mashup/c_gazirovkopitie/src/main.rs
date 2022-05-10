@@ -5,7 +5,20 @@ use algo_lib::io::output::output;
 use algo_lib::{out, out_line};
 
 fn solve(input: &mut Input, _test_case: usize) {
-    
+    //n, k, l, c, d, p, nl, np
+    let n: u32 = input.read();
+    let k: u32 = input.read();
+    let l: u32 = input.read();
+    let c: u32 = input.read();
+    let d: u32 = input.read();
+    let p: u32 = input.read();
+    let nl: u32 = input.read();
+    let np: u32 = input.read();
+    let n1 = (k * l )/ nl;
+    let n2 = c * d;
+    let n3 = p / np;
+    let toasts = vec![n1, n2, n3].into_iter().min().unwrap();
+    out!(toasts / n);
 }
 
 pub(crate) fn run(mut input: Input) -> bool {
