@@ -1,9 +1,12 @@
+use crate::dsu::DSU;
+
 #[derive(Clone, PartialEq, Eq)]
 enum Version {
     Current(usize),
     Draft(usize),
 }
 
+#[derive(Clone)]
 pub struct DSUR {
     current: Vec<usize>,
     draft: Vec<usize>,
@@ -27,6 +30,17 @@ impl DSUR {
         }
     }
 
+    pub fn clone_current(&mut self) -> Self {
+        let size = self.count;
+        DSUR {
+            current: (0..size).map(|x| self.find(x)).collect(),
+            draft: (0..size).collect(),
+            versions: vec![Version::Current(0); size],
+            cur_version: Version::Current(0),
+            count: size,
+        }
+    }
+
     pub fn save(&mut self) {
         self.cur_version = match self.cur_version {
             Version::Current(x) => Version::Draft(x + 1),
@@ -43,10 +57,8 @@ impl DSUR {
 
     fn get(&self, x: usize) -> usize {
         match (&self.cur_version, &self.versions[x]) {
-            (Version::Current(_), _) => self.current[x],
-            (Version::Draft(_), Version::Current(_)) => self.current[x],
             (Version::Draft(v1), Version::Draft(v2)) if v1 == v2 => self.draft[x],
-            (Version::Draft(_), Version::Draft(_)) => self.current[x],
+            (_, _) => self.current[x],
         }
     }
 
@@ -135,6 +147,7 @@ mod tests {
         assert_eq!(to_vec(&mut set), vec![0, 1, 2, 2, 1]);
         set.union(0, 4);
         assert_eq!(to_vec(&mut set), vec![0, 0, 2, 2, 0]);
+
         set.restore();
         assert_eq!(to_vec(&mut set), vec![0, 1, 2, 2, 1]);
     }
@@ -156,5 +169,19 @@ mod tests {
         assert_eq!(to_vec(&mut set), vec![0, 0, 2, 0, 2]);
         set.restore();
         assert_eq!(to_vec(&mut set), vec![0, 0, 2, 3, 2]);
+    }
+
+    #[test]
+    pub fn test_clone() {
+        let mut set = DSUR::new(5);
+        set.save();
+        set.union(1, 4);
+        set.union(2, 3);
+        set.restore();
+        set.union(0, 1);
+        set.union(2, 4);
+        set.save();
+        set.union(0, 3);
+        assert_eq!(to_vec(&mut set.clone_current()), vec![0, 0, 2, 0, 2]);
     }
 }

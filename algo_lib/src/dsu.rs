@@ -61,7 +61,6 @@ impl DSU {
 
 #[cfg(test)]
 mod tests {
-    use rayon::vec;
 
     use super::DSU;
 

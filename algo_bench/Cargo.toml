@@ -12,3 +12,4 @@ name = "algo_bench"
 [dependencies]
 algo_lib = {path = "../algo_lib"}
 bencher = "0.1.5"
+rand="0.8.5"

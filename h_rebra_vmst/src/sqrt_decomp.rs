@@ -1,0 +1,147 @@
+//{"name":"H. Ребра в MST","group":"Codeforces - CP3 DSU Mashup","url":"https://codeforces.com/group/kgiEExP5XR/contest/380181/problem/H","interactive":false,"timeLimit":2000,"tests":[{"input":"4 5\n1 2 101\n1 3 100\n2 3 2\n2 4 2\n3 4 1\n","output":"none\nany\nat least one\nat least one\nany\n"},{"input":"3 3\n1 2 1\n2 3 1\n1 3 2\n","output":"any\nany\nnone\n"},{"input":"3 3\n1 2 1\n2 3 1\n1 3 1\n","output":"at least one\nat least one\nat least one\n"}],"testType":"single","input":{"type":"stdin","fileName":null,"pattern":null},"output":{"type":"stdout","fileName":null,"pattern":null},"languages":{"java":{"taskClass":"HRebraVMST"}}}
+
+use std::collections::BinaryHeap;
+
+use algo_lib::dsu_r::DSUR;
+use algo_lib::io::input::Input;
+use algo_lib::io::output::output;
+use algo_lib::{out, out_line};
+
+const NONE: u8 = 1;
+const ANY: u8 = 2;
+const AT_LEAST_ONE: u8 = 3;
+
+#[derive(Debug, PartialEq, Eq, Ord)]
+struct Edge {
+    index: usize,
+    from: usize,
+    to: usize,
+    weight: usize,
+}
+
+impl PartialOrd for Edge {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let res = other.weight.partial_cmp(&self.weight);
+        match res {
+            Some(std::cmp::Ordering::Equal) => other.index.partial_cmp(&self.index),
+            _ => res,
+        }
+    }
+}
+
+fn pop_next_size(edges: &mut BinaryHeap<Edge>) -> Option<Vec<Edge>> {
+    if let Some(next) = edges.pop() {
+        let mut batch = Vec::new();
+        let w = next.weight;
+        batch.push(next);
+
+        while let Some(next) = edges.peek() {
+            if next.weight == w {
+                batch.push(edges.pop().unwrap());
+            } else {
+                break;
+            }
+        }
+
+        return Some(batch);
+    }
+    None
+}
+
+fn solve(input: &mut Input, _test_case: usize) {
+    let (n, m) = input.read::<(usize, usize)>();
+    //We store edges in min-heap
+    let mut edges = input
+        .read_vec::<(usize, usize, usize)>(m)
+        .into_iter()
+        .enumerate()
+        .map(|(index, x)| Edge {
+            index,
+            from: x.0,
+            to: x.1,
+            weight: x.2,
+        })
+        .collect::<BinaryHeap<Edge>>();
+
+    let mut result = vec![NONE; m];
+    let mut set = DSUR::new(n + 1);
+
+    while let Some(next_size) = pop_next_size(&mut edges) {
+        if next_size.len() == 1 {
+            let edge = next_size.first().unwrap();
+            if set.find(edge.from) != set.find(edge.to) {
+                result[edge.index] = ANY;
+                set.union(edge.from, edge.to);
+            }
+            continue;
+        } else {
+            let mut bucket_size = (m as f64).sqrt() as usize;
+
+            if bucket_size < 10 {
+                bucket_size = next_size.len();
+            }
+
+            for edge in next_size.iter() {
+                if set.find(edge.from) != set.find(edge.to) {
+                    result[edge.index] = AT_LEAST_ONE;
+                }
+            }
+
+            for (batch_index, bucket) in next_size.chunks(bucket_size).enumerate() {
+                set.save();
+
+                // Put all edges EXCEPT the current chunk to the set
+                for (i, edge) in next_size.iter().enumerate() {
+                    let cur_batch_index = i / bucket_size;
+                    if result[edge.index] != NONE && cur_batch_index != batch_index {
+                        set.union(edge.from, edge.to);
+                    }
+                }
+
+                let mut cloned_dsu = set.clone_current();
+
+                for edge in bucket {
+                    cloned_dsu.save();
+                    for other_edge in bucket {
+                        if result[other_edge.index] != NONE && edge.index != other_edge.index {
+                            cloned_dsu.union(other_edge.from, other_edge.to);
+                        }
+                    }
+                    if cloned_dsu.find(edge.from) != cloned_dsu.find(edge.to) {
+                        result[edge.index] = ANY;
+                    }
+                    cloned_dsu.restore();
+                }
+                set.restore();
+            }
+
+            for edge in next_size {
+                set.union(edge.from, edge.to);
+            }
+        }
+    }
+
+    for i in 0..result.len() {
+        out_line!(match result[i] {
+            NONE => "none",
+            ANY => "any",
+            AT_LEAST_ONE => "at least one",
+            _ => panic!("unreachable"),
+        });
+    }
+}
+
+pub(crate) fn run(mut input: Input) -> bool {
+    solve(&mut input, 1);
+    output().flush();
+    input.skip_whitespace();
+    !input.peek().is_some()
+}
+
+//START MAIN
+mod tester;
+
+fn main() {
+    tester::run_tests();
+}
+//END MAIN
