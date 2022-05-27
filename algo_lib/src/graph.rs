@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Clone)]
 struct InnerEdge {
     pub to: usize,
@@ -17,30 +19,48 @@ impl InnerEdge {
 }
 
 pub struct Graph {
-    edges: Vec<Vec<InnerEdge>>,
+    edges: HashMap<usize, Vec<InnerEdge>>,
     edge_count: usize,
-    adjacency: Vec<Vec<InnerEdge>>,
 }
 
 impl Graph {
-    pub fn new(vertex_count: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            edges: vec![Vec::new(); vertex_count],
+            edges: HashMap::new(),
             edge_count: 0,
-            adjacency: vec![Vec::new(); vertex_count],
         }
     }
 
     pub fn add_unidirected_edge<E: Edge>(&mut self, edge: &E) -> &mut Self {
-        self.adjacency[edge.get_to()].push(InnerEdge::new(edge.get_from(), edge.get_id()));
-        self.adjacency[edge.get_from()].push(InnerEdge::new(edge.get_to(), edge.get_id()));
+        let inner_edge = InnerEdge::new(edge.get_to(), edge.get_id());
+        let reverse_edge = InnerEdge::new(edge.get_from(), edge.get_id());
+
+        self.edges
+            .entry(edge.get_from())
+            .or_insert_with(|| vec![inner_edge.clone()])
+            .push(inner_edge);
+
+        self.edges
+            .entry(edge.get_to())
+            .or_insert_with(|| vec![reverse_edge.clone()])
+            .push(reverse_edge);
         self.edge_count += 1;
         self
     }
 
     pub fn add_edge(&mut self, from: usize, to: usize) -> &mut Self {
-        self.edges[from].push(InnerEdge::new(to, self.edge_count + 1));
-        self.edges[to].push(InnerEdge::new(from, self.edge_count + 1));
+        let inner_edge = InnerEdge::new(to, self.edge_count);
+        let reverse_edge = InnerEdge::new(from, self.edge_count);
+
+        self.edges
+            .entry(from)
+            .or_insert_with(|| vec![inner_edge.clone()])
+            .push(inner_edge);
+
+        self.edges
+            .entry(to)
+            .or_insert_with(|| vec![reverse_edge.clone()])
+            .push(reverse_edge);
         self.edge_count += 1;
         self
     }
@@ -49,16 +69,19 @@ impl Graph {
         self.edges.len()
     }
 
-    pub fn build_low_link(&self) -> LowLink {
-        LowLink::new(self).search()
+    pub fn build_low_link<I>(&self, vertices: I) -> LowLink
+    where
+        I: Iterator<Item = usize>,
+    {
+        LowLink::new(self).search(vertices)
     }
 }
 
 pub struct LowLink<'a> {
     counter: usize,
     graph: &'a Graph,
-    low_links: Vec<usize>,
-    pre_order: Vec<usize>,
+    low_links: HashMap<usize, usize>,
+    pre_order: HashMap<usize, usize>,
     bridges: Vec<usize>,
 }
 
@@ -67,15 +90,18 @@ impl<'a> LowLink<'a> {
         Self {
             counter: 0,
             graph: g,
-            low_links: vec![0; g.edges.len()],
-            pre_order: vec![0; g.edges.len()],
+            low_links: HashMap::new(),
+            pre_order: HashMap::new(),
             bridges: vec![],
         }
     }
 
-    fn search(mut self) -> Self {
-        for v in 0..self.pre_order.len() {
-            if self.pre_order[v] == 0 {
+    fn search<I>(mut self, vertices: I) -> Self
+    where
+        I: Iterator<Item = usize>,
+    {
+        for v in vertices {
+            if self.pre_order.get(&v).is_none() {
                 self.dfs(v, v, 0);
             }
         }
@@ -83,28 +109,38 @@ impl<'a> LowLink<'a> {
     }
 
     fn dfs(&mut self, cur: usize, parent: usize, id: usize) -> usize {
-        eprintln!("dfs: {}->{}", parent, cur);
-        if self.pre_order[cur] != 0 {
-            self.low_links[parent] = std::cmp::min(self.low_links[parent], self.pre_order[cur]);
-            return self.low_links[parent];
+        //eprintln!("{0}->{1}", parent, cur);
+        if let Some(cur_pre_order) = self.pre_order.get(&cur) {
+            return match self
+                .low_links
+                .entry(parent)
+                .and_modify(|link| *link = std::cmp::min(*link, *cur_pre_order))
+            {
+                std::collections::hash_map::Entry::Occupied(res) => *res.get(),
+                std::collections::hash_map::Entry::Vacant(_) => panic!("unreachable"),
+            };
         }
         self.counter += 1;
-        self.pre_order[cur] = self.counter;
-        self.low_links[cur] = self.pre_order[cur];
+        self.pre_order.insert(cur, self.counter);
+        self.low_links.insert(cur, self.counter);
 
-        for edge in self.graph.edges[cur].iter() {
+        for edge in self.graph.edges.get(&cur).into_iter().flatten() {
             if edge.id == id {
                 continue;
             }
 
             if self.dfs(edge.to, cur, edge.id) == 0 {
-                self.low_links[cur] = std::cmp::min(self.low_links[cur], self.low_links[edge.to]);
+                let to = *self.low_links.get(&edge.to).unwrap();
+                self.low_links
+                    .entry(cur)
+                    .and_modify(|link| *link = std::cmp::min(*link, to));
 
-                if self.low_links[edge.to] == self.pre_order[edge.to] {
+                if self.low_links[&edge.to] == self.pre_order[&edge.to] {
                     self.bridges.push(edge.id)
                 }
             }
         }
+
         return 0;
     }
 
@@ -120,18 +156,15 @@ mod tests {
 
     #[test]
     fn test0() {
-        let mut g = Graph::new(3);
+        let mut g = Graph::new();
         g.add_edge(0, 1).add_edge(0, 2).add_edge(1, 2);
-        let low_link = g.build_low_link();
-        let links = (0..g.vertex_count())
-            .map(|x| (low_link.pre_order[x], low_link.low_links[x]))
-            .collect::<Vec<(usize, usize)>>();
-        assert_eq!(links, vec![]);
+        let low_link = g.build_low_link(0..3);
+        assert_eq!(low_link.bridges().cloned().collect::<Vec<usize>>(), vec![]);
     }
 
     #[test]
     fn test1() {
-        let mut g = Graph::new(10);
+        let mut g = Graph::new();
         g.add_edge(0, 1)
             .add_edge(0, 2)
             .add_edge(1, 2)
@@ -145,10 +178,10 @@ mod tests {
             .add_edge(7, 8)
             .add_edge(7, 9);
 
-        let low_link = g.build_low_link();
-        let result = (0..10)
-            .map(|x| (low_link.pre_order[x], low_link.low_links[x]))
-            .collect::<Vec<(usize, usize)>>();
-        assert_eq!(result, vec![]);
+        let low_link = g.build_low_link(0..10);
+        assert_eq!(
+            low_link.bridges().cloned().collect::<Vec<usize>>(),
+            vec![5, 10, 11, 9]
+        );
     }
 }

@@ -4,7 +4,8 @@
 pub mod compress;
 pub mod dsu;
 pub mod dsu_r;
+pub mod graph;
+pub mod graph_2;
 pub mod io;
 pub mod seg_tree;
 pub mod xor_set;
-pub mod graph;

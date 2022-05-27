@@ -1,8 +1,8 @@
 //{"name":"H. Ребра в MST","group":"Codeforces - CP3 DSU Mashup","url":"https://codeforces.com/group/kgiEExP5XR/contest/380181/problem/H","interactive":false,"timeLimit":2000,"tests":[{"input":"4 5\n1 2 101\n1 3 100\n2 3 2\n2 4 2\n3 4 1\n","output":"none\nany\nat least one\nat least one\nany\n"},{"input":"3 3\n1 2 1\n2 3 1\n1 3 2\n","output":"any\nany\nnone\n"},{"input":"3 3\n1 2 1\n2 3 1\n1 3 1\n","output":"at least one\nat least one\nat least one\n"}],"testType":"single","input":{"type":"stdin","fileName":null,"pattern":null},"output":{"type":"stdout","fileName":null,"pattern":null},"languages":{"java":{"taskClass":"HRebraVMST"}}}
 
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 
-use algo_lib::dsu_r::DSUR;
+use algo_lib::dsu::DSU;
 use algo_lib::graph::{self, Graph};
 use algo_lib::io::input::Input;
 use algo_lib::io::output::output;
@@ -20,6 +20,17 @@ struct Edge {
     weight: usize,
 }
 
+impl Edge {
+    fn new(index: usize, from: usize, to: usize, weight: usize) -> Self {
+        Edge {
+            index,
+            from,
+            to,
+            weight,
+        }
+    }
+}
+
 impl graph::Edge for Edge {
     fn get_from(&self) -> usize {
         self.from - 1
@@ -30,7 +41,7 @@ impl graph::Edge for Edge {
     }
 
     fn get_id(&self) -> usize {
-        self.index
+        self.index + 1
     }
 }
 
@@ -79,23 +90,42 @@ fn solve(input: &mut Input, _test_case: usize) {
         .collect::<BinaryHeap<Edge>>();
 
     let mut result = vec![NONE; m];
-    let mut set = DSUR::new(n + 1);
-
-    let mut g = Graph::new(n);
+    let mut set = DSU::new(n + 1);
 
     while let Some(next_size) = pop_next_size(&mut edges) {
+        if next_size.len() == 1 {
+            let edge = next_size.first().unwrap();
+            if set.find(edge.from) != set.find(edge.to) {
+                result[edge.index] = ANY;
+                set.union(edge.from, edge.to);
+            }
+            continue;
+        }
+
+        let mut g = Graph::new();
+        let mut vertices = HashSet::<usize>::new();
+
         for edge in next_size.iter() {
             if set.find(edge.from) != set.find(edge.to) {
                 result[edge.index] = AT_LEAST_ONE;
+                g.add_unidirected_edge(&Edge::new(
+                    edge.index,
+                    set.find(edge.from),
+                    set.find(edge.to),
+                    edge.weight,
+                ));
+                vertices.insert(set.find(edge.from) - 1);
+                vertices.insert(set.find(edge.to) - 1);
             }
         }
-        for edge in next_size.iter() {
-            set.union(edge.from, edge.to);
-            g.add_unidirected_edge(edge);
+        for edge_id in g.build_low_link(vertices.into_iter()).bridges() {
+            result[*edge_id - 1] = ANY;
         }
 
-        for edge_index in g.build_low_link().bridges() {
-            result[*edge_index] = ANY;
+        for edge in next_size.iter() {
+            if result[edge.index] != NONE {
+                set.union(edge.from, edge.to);
+            }
         }
     }
 
@@ -114,6 +144,24 @@ pub(crate) fn run(mut input: Input) -> bool {
     output().flush();
     input.skip_whitespace();
     !input.peek().is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_1() {
+        let mut g = Graph::new();
+        g.add_unidirected_edge(&Edge {
+            from: 4,
+            to: 3,
+            index: 1,
+            weight: 1,
+        });
+        let link = g.build_low_link(0..4);
+        let bridges: Vec<_> = link.bridges().cloned().collect();
+        assert_eq!(bridges, vec![1]);
+    }
 }
 
 //START MAIN
