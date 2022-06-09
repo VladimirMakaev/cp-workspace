@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "h_rebra_vmst",
   "main",
   "algo_lib",
   "algo_bench",

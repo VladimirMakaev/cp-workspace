@@ -4,6 +4,7 @@
 pub mod compress;
 pub mod dsu;
 pub mod dsu_r;
+pub mod geo;
 pub mod graph;
 pub mod graph_2;
 pub mod io;
