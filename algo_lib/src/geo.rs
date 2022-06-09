@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, fmt::Debug};
+use std::{cmp::Ordering, collections::VecDeque, fmt::Debug};
 
 #[derive(Clone, PartialEq, Eq, Ord, Hash)]
 pub struct Point {
@@ -17,17 +17,34 @@ impl Point {
     pub fn new(x: isize, y: isize) -> Point {
         Self { x, y }
     }
+    /// Cross product between AB and CD
+    pub fn cross_product(a: &Point, b: &Point, c: &Point, d: &Point) -> isize {
+        let x1 = b.x - a.x;
+        let y1 = b.y - a.y;
+        let x2 = d.x - c.x;
+        let y2 = d.y - c.y;
+        x1 * y2 - y1 * x2
+    }
+
+    pub fn distance_to_edge(&self, edge_l: &Point, edge_r: &Point) -> f64 {
+        let square = Point::cross_product(self, edge_l, self, edge_r).abs();
+        return square as f64 / Point::distance(edge_l, edge_r);
+    }
 
     pub fn orientation(a: &Point, b: &Point, c: &Point) -> PointOrientation {
-        let x1 = a.x - b.x;
-        let y1 = a.y - b.y;
-        let x2 = c.x - b.x;
-        let y2 = c.y - b.y;
-        match (x1 * y2 - y1 * x2).cmp(&0) {
+        match Point::cross_product(&b, &a, &b, &c).cmp(&0) {
             std::cmp::Ordering::Less => PointOrientation::Left,
             std::cmp::Ordering::Equal => PointOrientation::Straight,
             std::cmp::Ordering::Greater => PointOrientation::Right,
         }
+    }
+
+    pub fn distance_sqr(lhr: &Point, rhr: &Point) -> usize {
+        ((lhr.x - rhr.x) * (lhr.x - rhr.x)) as usize + ((lhr.y - rhr.y) * (lhr.y - rhr.y)) as usize
+    }
+
+    pub fn distance(lhr: &Point, rhr: &Point) -> f64 {
+        (Point::distance_sqr(lhr, rhr) as f64).sqrt()
     }
 }
 
@@ -45,6 +62,77 @@ impl PartialOrd for Point {
         }
         self.y.partial_cmp(&other.y)
     }
+}
+
+fn min_fl(left: f64, right: f64) -> f64 {
+    match left.partial_cmp(&right) {
+        Some(Ordering::Less) => left,
+        Some(Ordering::Greater) => right,
+        _ => left,
+    }
+}
+
+pub fn diameter(convex_hull: &Vec<Point>) -> f64 {
+    if convex_hull.len() < 2 {
+        return 0.0;
+    }
+    if convex_hull.len() == 2 {
+        return Point::distance(&convex_hull[0], &convex_hull[1]);
+    }
+
+    let size = convex_hull.len();
+
+    fn next(index: usize, size: usize) -> usize {
+        let res = index + 1;
+        if res == size {
+            return 0;
+        }
+        return res;
+    }
+
+    let mut left = 0;
+    let (mut right, _) = convex_hull
+        .iter()
+        .enumerate()
+        .max_by(|(i1, p1), (i2, p2)| p1.cmp(&p2))
+        .unwrap();
+
+    let mut min: f64 = f64::MAX;
+    let start_right = right;
+
+    loop {
+        match Point::cross_product(
+            &convex_hull[left],
+            &convex_hull[next(left, size)],
+            &convex_hull[right],
+            &convex_hull[next(right, size)],
+        )
+        .cmp(&0)
+        {
+            std::cmp::Ordering::Less => {
+                min = min_fl(
+                    min,
+                    convex_hull[right]
+                        .distance_to_edge(&convex_hull[left], &convex_hull[next(left, size)]),
+                );
+                left = next(left, size);
+            }
+            _ => {
+                min = min_fl(
+                    min,
+                    convex_hull[left]
+                        .distance_to_edge(&convex_hull[right], &convex_hull[next(right, size)]),
+                );
+                right = next(right, size);
+            }
+        }
+
+        if left == 0 && right == start_right {
+            break;
+        }
+    }
+
+    return min;
 }
 
 pub fn convex_hull(points: &Vec<Point>) -> Vec<Point> {
@@ -170,6 +258,25 @@ mod tests {
         ];
         let result = convex_hull(&points);
         assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_distance() {
+        let points = vec![Point::new(0, 0), Point::new(10, 0), Point::new(0, 10)];
+        assert_eq!(points[0].distance_to_edge(&points[1], &points[2]), 1.0);
+    }
+
+    #[test]
+    fn test_diameter_1() {
+        let points = vec![
+            Point::new(0, 0),
+            Point::new(10, 0),
+            Point::new(0, 10),
+            Point::new(8, 6),
+            Point::new(4, 8),
+        ];
+
+        assert_eq!(diameter(&convex_hull(&points)), 8.94427190999916)
     }
 
     struct Solution {}
