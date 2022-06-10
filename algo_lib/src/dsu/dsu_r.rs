@@ -1,5 +1,3 @@
-use crate::dsu::DSU;
-
 #[derive(Clone, PartialEq, Eq)]
 enum Version {
     Current(usize),
